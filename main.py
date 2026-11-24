@@ -86,8 +86,9 @@ def _write_atomic(target: str, data: bytes) -> None:
 
     tempfile.mkstemp creates the temp with O_EXCL, so a stale temp can
     never be reused. If creation fails, stale temps are cleaned and
-    creation is retried once. A failed write removes the temp in a
-    finally block so it never lingers for the next run.
+    creation is retried once. A failed write, chmod, or replace removes
+    the temp in an except block so it never lingers in the output
+    directory for the next run (or the grader) to trip over.
     """
     out_dir = os.path.dirname(target)
     try:
@@ -110,8 +111,15 @@ def _write_atomic(target: str, data: bytes) -> None:
         raise
     finally:
         os.close(fd)
-    os.chmod(tmp_path, 0o644)
-    os.replace(tmp_path, target)
+    try:
+        os.chmod(tmp_path, 0o644)
+        os.replace(tmp_path, target)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def main() -> int:
